@@ -1,0 +1,934 @@
+[4mcurl[24m(1)                                     curl Manual                                     [4mcurl[24m(1)
+
+[1mNAME[0m
+       curl - transfer a URL
+
+[1mSYNOPSIS[0m
+       [1mcurl [options / URLs][0m
+
+[1mDESCRIPTION[0m
+       [1mcurl  [22mis a tool for transferring data from or to a server using URLs. It supports these pro‐
+       tocols: DICT, FILE, FTP, FTPS, GOPHER, GOPHERS, HTTP, HTTPS, IMAP, IMAPS, LDAP, LDAPS, MQTT,
+       POP3, POP3S, RTMP, RTMPS, RTSP, SCP, SFTP, SMB, SMBS, SMTP, SMTPS, TELNET, TFTP, WS and WSS.
+
+       curl is powered by libcurl for all transfer-related features. See [4mlibcurl(3)[24m for details.
+
+[1mURL[0m
+       The URL syntax is protocol-dependent. You find a detailed description in RFC 3986.
+
+       If you provide a URL without a leading [1mprotocol:// [22mscheme, curl guesses  what  protocol  you
+       want.  It  then  defaults to HTTP but assumes others based on often-used host name prefixes.
+       For example, for host names starting with "ftp." curl assumes you want FTP.
+
+       You can specify any amount of URLs on the command line. They are  fetched  in  a  sequential
+       manner  in  the  specified order unless you use [4m-Z,[24m [4m--parallel[24m. You can specify command line
+       options and URLs mixed and in any order on the command line.
+
+       curl attempts to reuse connections when doing multiple transfers, so that getting many files
+       from the same server do not use multiple connects and setup handshakes. This improves speed.
+       Connection reuse can only be done for URLs specified for a single  command  line  invocation
+       and cannot be performed between separate curl runs.
+
+       Provide an IPv6 zone id in the URL with an escaped percentage sign. Like in
+
+         "http://[fe80::3%25eth0]/"
+
+       Everything  provided  on the command line that is not a command line option or its argument,
+       curl assumes is a URL and treats it as such.
+
+[1mGLOBBING[0m
+       You can specify multiple URLs or parts of URLs by writing  lists  within  braces  or  ranges
+       within brackets. We call this "globbing".
+
+       Provide a list with three different names like this:
+
+         "http://site.{one,two,three}.com"
+
+       or you can get sequences of alphanumeric series by using [] as in:
+
+         "ftp://ftp.example.com/file[1-100].txt"
+
+         "ftp://ftp.example.com/file[001-100].txt"    (with leading zeros)
+
+         "ftp://ftp.example.com/file[a-z].txt"
+
+       Nested sequences are not supported, but you can use several ones next to each other:
+
+         "http://example.com/archive[1996-1999]/vol[1-4]/part{a,b,c}.html"
+
+       You can specify a step counter for the ranges to get every Nth number or letter:
+
+         "http://example.com/file[1-100:10].txt"
+
+         "http://example.com/file[a-z:2].txt"
+
+       When  using [] or {} sequences when invoked from a command line prompt, you probably have to
+       put the full URL within double quotes to avoid the shell from interfering with it. This also
+       goes for other characters treated special, like for example '&', '?' and '*'.
+
+       Switch off globbing with [4m-g,[24m [4m--globoff[24m.
+
+[1mVARIABLES[0m
+       curl supports command line  variables  (added  in  8.3.0).  Set  variables  with  [4m--variable[0m
+       name=content  or  [4m--variable[24m  name@file  (where  "file" can be stdin if set to a single dash
+       (-)).
+
+       Variable contents can expanded in option parameters using "{{name}}" (without the quotes) if
+       the option name is prefixed with "--expand-". This gets the contents of the variable  "name"
+       inserted,  or  a blank if the name does not exist as a variable. Insert "{{" verbatim in the
+       string by prefixing it with a backslash, like "\{{".
+
+       You an access and expand environment variables by first importing them. You  can  select  to
+       either require the environment variable to be set or you can provide a default value in case
+       it  is  not already set. Plain [4m--variable[24m %name imports the variable called 'name' but exits
+       with an error if that environment variable is not already set. To provide a default value if
+       it is not set, use [4m--variable[24m %name=content or [4m--variable[24m %name@content.
+
+       Example. Get the USER environment variable into the URL, fail if USER is not set:
+
+        --variable '%USER'
+        --expand-url = "https://example.com/api/{{USER}}/method"
+
+       When expanding variables, curl supports a set of functions that can make the  variable  con‐
+       tents more convenient to use. It can trim leading and trailing white space with [4mtrim[24m, it can
+       output  the  contents  as  a JSON quoted string with [4mjson[24m, URL encode the string with [4murl[24m or
+       base64 encode it with [4mb64[24m. You apply function to a variable expansion, add them colon  sepa‐
+       rated  to  the  right side of the variable. Variable content holding null bytes that are not
+       encoded when expanded cause error.
+
+       Example: get the contents of a file called $HOME/.secret into a variable called "fix".  Make
+       sure that the content is trimmed and percent-encoded sent as POST data:
+
+         --variable %HOME
+         --expand-variable fix@{{HOME}}/.secret
+         --expand-data "{{fix:trim:url}}"
+         https://example.com/
+
+       Command line variables and expansions were added in in 8.3.0.
+
+[1mOUTPUT[0m
+       If  not told otherwise, curl writes the received data to stdout. It can be instructed to in‐
+       stead save that data into a local file, using the [4m-o,[24m [4m--output[24m or [4m-O,[24m [4m--remote-name[24m options.
+       If curl is given multiple URLs to transfer on the command line, it similarly needs  multiple
+       options for where to save them.
+
+       curl  does  not  parse or otherwise "understand" the content it gets or writes as output. It
+       does no encoding or decoding, unless explicitly asked to with  dedicated  command  line  op‐
+       tions.
+
+[1mPROTOCOLS[0m
+       curl  supports  numerous  protocols, or put in URL terms: schemes. Your particular build may
+       not support them all.
+
+       DICT   Lets you lookup words using online dictionaries.
+
+       FILE   Read or write local files. curl does not support accessing file:// URL remotely,  but
+              when running on Microsoft Windows using the native UNC approach works.
+
+       FTP(S) curl  supports  the  File  Transfer Protocol with a lot of tweaks and levers. With or
+              without using TLS.
+
+       GOPHER(S)
+              Retrieve files.
+
+       HTTP(S)
+              curl supports HTTP with numerous options and variations. It can  speak  HTTP  version
+              0.9,  1.0,  1.1,  2 and 3 depending on build options and the correct command line op‐
+              tions.
+
+       IMAP(S)
+              Using the mail reading protocol, curl can "download" emails for you. With or  without
+              using TLS.
+
+       LDAP(S)
+              curl can do directory lookups for you, with or without TLS.
+
+       MQTT   curl  supports  MQTT  version  3. Downloading over MQTT equals "subscribe" to a topic
+              while uploading/posting equals "publish" on a topic. MQTT over TLS is  not  supported
+              (yet).
+
+       POP3(S)
+              Downloading from a pop3 server means getting a mail. With or without using TLS.
+
+       RTMP(S)
+              The  Realtime  Messaging Protocol is primarily used to serve streaming media and curl
+              can download it.
+
+       RTSP   curl supports RTSP 1.0 downloads.
+
+       SCP    curl supports SSH version 2 scp transfers.
+
+       SFTP   curl supports SFTP (draft 5) done over SSH version 2.
+
+       SMB(S) curl supports SMB version 1 for upload and download.
+
+       SMTP(S)
+              Uploading contents to an SMTP server means sending an email. With or without TLS.
+
+       TELNET Telling curl to fetch a telnet URL starts an interactive session where it sends  what
+              it reads on stdin and outputs what the server sends it.
+
+       TFTP   curl can do TFTP downloads and uploads.
+
+[1mPROGRESS METER[0m
+       curl  normally  displays a progress meter during operations, indicating the amount of trans‐
+       ferred data, transfer speeds and estimated time left, etc. The progress meter  displays  the
+       transfer  rate in bytes per second. The suffixes (k, M, G, T, P) are 1024 based. For example
+       1k is 1024 bytes. 1M is 1048576 bytes.
+
+       curl displays this data to the terminal by default, so if you invoke curl to do an operation
+       and it is about to write data to the terminal, it [4mdisables[24m the progress meter  as  otherwise
+       it would mess up the output mixing progress meter and response data.
+
+       If  you  want  a  progress meter for HTTP POST or PUT requests, you need to redirect the re‐
+       sponse output to a file, using shell redirect (>), [4m-o,[24m [4m--output[24m or similar.
+
+       This does not apply to FTP upload as that operation does not spit out any response  data  to
+       the terminal.
+
+       If  you  prefer  a  progress  "bar" instead of the regular meter, [4m-#,[24m [4m--progress-bar[24m is your
+       friend. You can also disable the progress meter completely with the [4m-s,[24m [4m--silent[24m option.
+
+[1mVERSION[0m
+       This man page describes curl 8.5.0. If you use a later version, chances are  this  man  page
+       does  not  fully  document it. If you use an earlier version, this document tries to include
+       version information about which specific version that introduced changes.
+
+       You can always learn which the latest curl version is by running
+
+         curl https://curl.se/info
+
+       The  online  version  of  this  man  page  is  always  showing   the   latest   incarnation:
+       https://curl.se/docs/manpage.html
+
+[1mOPTIONS[0m
+       Options  start  with one or two dashes. Many of the options require an additional value next
+       to them. If provided text does not start with a dash, it is presumed to be and treated as  a
+       URL.
+
+       The  short  "single-dash" form of the options, -d for example, may be used with or without a
+       space between it and its value, although a space is a recommended separator. The long  "dou‐
+       ble-dash" form, [4m-d,[24m [4m--data[24m for example, requires a space between it and its value.
+
+       Short version options that do not need any additional values can be used immediately next to
+       each other, like for example you can specify all the options [4m-O[24m, [4m-L[24m and [4m-v[24m at once as [4m-OLv[24m.
+
+       In  general,  all  boolean  options  are  enabled  with --[1moption [22mand yet again disabled with
+       --[1mno-[22moption. That is, you use the same option name but prefix it  with  "no-".  However,  in
+       this list we mostly only list and show the [4m--option[24m version of them.
+
+       When  [4m-:,[24m [4m--next[24m is used, it resets the parser state and you start again with a clean option
+       state, except for the options that are "global". Global  options  retain  their  values  and
+       meaning even after [4m-:,[24m [4m--next[24m.
+
+       The  following options are global: [4m--fail-early[24m, [4m--libcurl[24m, [4m--parallel-immediate[24m, [4m-Z,[24m [4m--par‐[0m
+       [4mallel[24m,  [4m-#,[24m   [4m--progress-bar[24m,   [4m--rate[24m,   [4m-S,[24m   [4m--show-error[24m,   [4m--stderr[24m,   [4m--styled-output[24m,
+       [4m--trace-ascii[24m, [4m--trace-config[24m, [4m--trace-ids[24m, [4m--trace-time[24m, [4m--trace[24m and [4m-v,[24m [4m--verbose[24m.
+
+       --abstract-unix-socket <path>
+              (HTTP)  Connect through an abstract Unix domain socket, instead of using the network.
+              Note: netstat shows the path of an abstract socket prefixed  with  '@',  however  the
+              <path> argument should not have this leading character.
+
+              If [4m--abstract-unix-socket[24m is provided several times, the last set value is used.
+
+              Example:
+               curl --abstract-unix-socket socketpath https://example.com
+
+              See also [4m--unix-socket[24m. Added in 7.53.0.
+
+       --alt-svc <file name>
+              (HTTPS) This option enables the alt-svc parser in curl. If the file name points to an
+              existing alt-svc cache file, that gets used. After a completed transfer, the cache is
+              saved to the file name again if it has been modified.
+
+              Specify  a "" file name (zero length) to avoid loading/saving and make curl just han‐
+              dle the cache in memory.
+
+              If this option is used several times, curl loads contents from all the files but  the
+              last one is used for saving.
+
+              [4m--alt-svc[24m can be used several times in a command line
+
+              Example:
+               curl --alt-svc svc.txt https://example.com
+
+              See also [4m--resolve[24m and [4m--connect-to[24m. Added in 7.64.1.
+
+       --anyauth
+              (HTTP) Tells curl to figure out authentication method by itself, and use the most se‐
+              cure one the remote site claims to support. This is done by first doing a request and
+              checking  the  response-headers,  thus possibly inducing an extra network round-trip.
+              This is used instead of setting a specific authentication method, which  you  can  do
+              with [4m--basic[24m, [4m--digest[24m, [4m--ntlm[24m, and [4m--negotiate[24m.
+
+              Using [4m--anyauth[24m is not recommended if you do uploads from stdin, since it may require
+              data  to be sent twice and then the client must be able to rewind. If the need should
+              arise when uploading from stdin, the upload operation fails.
+
+              Used together with [4m-u,[24m [4m--user[24m.
+
+              Providing [4m--anyauth[24m multiple times has no extra effect.
+
+              Example:
+               curl --anyauth --user me:pwd https://example.com
+
+              See also [4m--proxy-anyauth[24m, [4m--basic[24m and [4m--digest[24m.
+
+       -a, --append
+              (FTP SFTP) When used in an upload, this option makes curl append to the  target  file
+              instead  of  overwriting  it.  If the remote file does not exist, it is created. Note
+              that this flag is ignored by some SFTP servers (including OpenSSH).
+
+              Providing [4m-a,[24m [4m--append[24m multiple times has no extra effect.   Disable  it  again  with
+              --no-append.
+
+              Example:
+               curl --upload-file local --append ftp://example.com/
+
+              See also [4m-r,[24m [4m--range[24m and [4m-C,[24m [4m--continue-at[24m.
+
+       --aws-sigv4 <provider1[:provider2[:region[:service]]]>
+              Use AWS V4 signature authentication in the transfer.
+
+              The  provider argument is a string that is used by the algorithm when creating outgo‐
+              ing authentication headers.
+
+              The region argument is a string that points to a geographic area of a resources  col‐
+              lection (region-code) when the region name is omitted from the endpoint.
+
+              The  service argument is a string that points to a function provided by a cloud (ser‐
+              vice-code) when the service name is omitted from the endpoint.
+
+              If [4m--aws-sigv4[24m is provided several times, the last set value is used.
+
+              Example:
+               curl --aws-sigv4 "aws:amz:us-east-2:es" --user "key:secret" https://example.com
+
+              See also [4m--basic[24m and [4m-u,[24m [4m--user[24m. Added in 7.75.0.
+
+       --basic
+              (HTTP) Tells curl to use HTTP Basic authentication with the remote host. This is  the
+              default  and this option is usually pointless, unless you use it to override a previ‐
+              ously set option that sets a different authentication method (such as  [4m--ntlm[24m,  [4m--di‐[0m
+              [4mgest[24m, or [4m--negotiate[24m).
+
+              Used together with [4m-u,[24m [4m--user[24m.
+
+              Providing [4m--basic[24m multiple times has no extra effect.
+
+              Example:
+               curl -u name:password --basic https://example.com
+
+              See also [4m--proxy-basic[24m.
+
+       --ca-native
+              (TLS)  Tells  curl to use the CA store from the native operating system to verify the
+              peer. By default, curl otherwise uses a CA store provided in a single file or  direc‐
+              tory, but when using this option it interfaces the operating system's own vault.
+
+              This  option  only  works for curl on Windows when built to use OpenSSL. When curl on
+              Windows is built to use Schannel, this feature is implied and curl then only uses the
+              native CA store.
+
+              curl built with wolfSSL also supports this option (added in 8.3.0).
+
+              Providing [4m--ca-native[24m multiple times has no extra  effect.   Disable  it  again  with
+              --no-ca-native.
+
+              Example:
+               curl --ca-native https://example.com
+
+              See also [4m--cacert[24m, [4m--capath[24m and [4m-k,[24m [4m--insecure[24m. Added in 8.2.0.
+
+       --cacert <file>
+              (TLS)  Tells  curl to use the specified certificate file to verify the peer. The file
+              may contain multiple CA certificates. The certificate(s) must be in PEM format.  Nor‐
+              mally  curl is built to use a default file for this, so this option is typically used
+              to alter that default file.
+
+              curl recognizes the environment variable named 'CURL_CA_BUNDLE' if  it  is  set,  and
+              uses  the  given path as a path to a CA cert bundle. This option overrides that vari‐
+              able.
+
+              The  windows  version  of  curl  automatically  looks  for  a  CA  certs  file  named
+              'curl-ca-bundle.crt',  either  in  the  same directory as curl.exe, or in the Current
+              Working Directory, or in any folder along your PATH.
+
+              (iOS and macOS only) If curl is built against Secure Transport, then this  option  is
+              supported  for  backward  compatibility  with other SSL engines, but it should not be
+              set. If the option is not set, then curl uses the certificates in the system and user
+              Keychain to verify the peer, which is the preferred method of  verifying  the  peer's
+              certificate chain.
+
+              (Schannel only) This option is supported for Schannel in Windows 7 or later (added in
+              7.60.0).  This option is supported for backward compatibility with other SSL engines;
+              instead it is recommended to use Windows' store of root certificates (the default for
+              Schannel).
+
+              If [4m--cacert[24m is provided several times, the last set value is used.
+
+              Example:
+               curl --cacert CA-file.txt https://example.com
+
+              See also [4m--capath[24m and [4m-k,[24m [4m--insecure[24m.
+
+       --capath <dir>
+              (TLS) Tells curl to use the specified certificate directory to verify the peer.  Mul‐
+              tiple  paths can be provided by separating them with ":" (e.g.  "path1:path2:path3").
+              The certificates must be in PEM format, and if curl is built against OpenSSL, the di‐
+              rectory must have been processed using the c_rehash utility  supplied  with  OpenSSL.
+              Using [4m--capath[24m can allow OpenSSL-powered curl to make SSL-connections much more effi‐
+              ciently than using [4m--cacert[24m if the [4m--cacert[24m file contains many CA certificates.
+
+              If this option is set, the default capath value is ignored.
+
+              If [4m--capath[24m is provided several times, the last set value is used.
+
+              Example:
+               curl --capath /local/directory https://example.com
+
+              See also [4m--cacert[24m and [4m-k,[24m [4m--insecure[24m.
+
+       --cert-status
+              (TLS) Tells curl to verify the status of the server certificate by using the Certifi‐
+              cate Status Request (aka. OCSP stapling) TLS extension.
+
+              If this option is enabled and the server sends an invalid (e.g. expired) response, if
+              the response suggests that the server certificate has been revoked, or no response at
+              all is received, the verification fails.
+
+              This is currently only implemented in the OpenSSL and GnuTLS backends.
+
+              Providing  [4m--cert-status[24m  multiple  times has no extra effect.  Disable it again with
+              --no-cert-status.
+
+              Example:
+               curl --cert-status https://example.com
+
+              See also [4m--pinnedpubkey[24m.
+
+       --cert-type <type>
+              (TLS) Tells curl what type the provided client certificate is using.  PEM,  DER,  ENG
+              and P12 are recognized types.
+
+              The  default  type  depends on the TLS backend and is usually PEM, however for Secure
+              Transport and Schannel it is P12. If [4m-E,[24m [4m--cert[24m is a pkcs11: URI then ENG is the  de‐
+              fault type.
+
+              If [4m--cert-type[24m is provided several times, the last set value is used.
+
+              Example:
+               curl --cert-type PEM --cert file https://example.com
+
+              See also [4m-E,[24m [4m--cert[24m, [4m--key[24m and [4m--key-type[24m.
+
+       -E, --cert <certificate[:password]>
+              (TLS)  Tells  curl  to  use the specified client certificate file when getting a file
+              with HTTPS, FTPS or another SSL-based protocol. The certificate must  be  in  PKCS#12
+              format if using Secure Transport, or PEM format if using any other engine. If the op‐
+              tional  password  is not specified, it is queried for on the terminal. Note that this
+              option assumes a certificate file that is the private key and the client  certificate
+              concatenated. See [4m-E,[24m [4m--cert[24m and [4m--key[24m to specify them independently.
+
+              In  the  <certificate>  portion of the argument, you must escape the character ":" as
+              "\:" so that it is not recognized as the password delimiter. Similarly, you must  es‐
+              cape the character "\" as "\\" so that it is not recognized as an escape character.
+
+              If  curl is built against OpenSSL library, and the engine pkcs11 is available, then a
+              PKCS#11 URI (RFC 7512) can be used to specify a certificate located in a PKCS#11  de‐
+              vice. A string beginning with "pkcs11:" is interpreted as a PKCS#11 URI. If a PKCS#11
+              URI is provided, then the [4m--engine[24m option is set as "pkcs11" if none was provided and
+              the [4m--cert-type[24m option is set as "ENG" if none was provided.
+
+              (iOS  and macOS only) If curl is built against Secure Transport, then the certificate
+              string can either be the name of a certificate/private key in the system or user key‐
+              chain, or the path to a PKCS#12-encoded certificate and private key. If you  want  to
+              use  a  file from the current directory, please precede it with "./" prefix, in order
+              to avoid confusion with a nickname.
+
+              (Schannel only) Client certificates must be specified by a path expression to a  cer‐
+              tificate  store.  (Loading [4mPFX[24m is not supported; you can import it to a store first).
+              You can use "<store location>\<store name>\<thumbprint>" to refer to a certificate in
+              the      system      certificates      store,       for       example,       [4m"Curren‐[0m
+              [4mtUser\MY\934a7ac6f8a5d579285a74fa61e19f23ddfe8d7a"[24m. Thumbprint is usually a SHA-1 hex
+              string  which  you can see in certificate details. Following store locations are sup‐
+              ported: [4mCurrentUser[24m, [4mLocalMachine[24m, [4mCurrentService[24m, [4mServices[24m,  [4mCurrentUserGroupPolicy[24m,
+              [4mLocalMachineGroupPolicy[24m and [4mLocalMachineEnterprise[24m.
+
+              If [4m-E,[24m [4m--cert[24m is provided several times, the last set value is used.
+
+              Example:
+               curl --cert certfile --key keyfile https://example.com
+
+              See also [4m--cert-type[24m, [4m--key[24m and [4m--key-type[24m.
+
+       --ciphers <list of ciphers>
+              (TLS)  Specifies  which  ciphers  to  use in the connection. The list of ciphers must
+              specify valid ciphers. Read up on SSL cipher list details on this URL:
+
+              https://curl.se/docs/ssl-ciphers.html
+
+              If [4m--ciphers[24m is provided several times, the last set value is used.
+
+              Example:
+               curl --ciphers ECDHE-ECDSA-AES256-CCM8 https://example.com
+
+              See also [4m--tlsv1.3[24m, [4m--tls13-ciphers[24m and [4m--proxy-ciphers[24m.
+
+       --compressed-ssh
+              (SCP SFTP) Enables built-in SSH compression.  This is a request, not  an  order;  the
+              server may or may not do it.
+
+              Providing [4m--compressed-ssh[24m multiple times has no extra effect.  Disable it again with
+              --no-compressed-ssh.
+
+              Example:
+               curl --compressed-ssh sftp://example.com/
+
+              See also [4m--compressed[24m. Added in 7.56.0.
+
+       --compressed
+              (HTTP)  Request  a compressed response using one of the algorithms curl supports, and
+              automatically decompress the content.
+
+              Response headers are not modified when saved, so if they are "interpreted" separately
+              again at a later point they might appear to be saying that  the  content  is  (still)
+              compressed; while in fact it has already been decompressed.
+
+              If  this option is used and the server sends an unsupported encoding, curl reports an
+              error. This is a request, not an order; the server may or may not deliver  data  com‐
+              pressed.
+
+              Providing  [4m--compressed[24m  multiple  times  has no extra effect.  Disable it again with
+              --no-compressed.
+
+              Example:
+               curl --compressed https://example.com
+
+              See also [4m--compressed-ssh[24m.
+
+       -K, --config <file>
+              Specify a text file to read curl arguments from. The command line arguments found  in
+              the text file are used as if they were provided on the command line.
+
+              Options  and  their  parameters must be specified on the same line in the file, sepa‐
+              rated by whitespace, colon, or the equals sign. Long option names can  optionally  be
+              given  in  the  config file without the initial double dashes and if so, the colon or
+              equals characters can be used as separators. If the option is specified with  one  or
+              two  dashes, there can be no colon or equals character between the option and its pa‐
+              rameter.
+
+              If the parameter contains whitespace or starts with a colon (:) or equals  sign  (=),
+              it must be specified enclosed within double quotes ("). Within double quotes the fol‐
+              lowing escape sequences are available: \\, \", \t, \n, \r and \v. A backslash preced‐
+              ing any other letter is ignored.
+
+              If  the  first  non-blank  column  of  a config line is a '#' character, that line is
+              treated as a comment.
+
+              Only write one option per physical line in the config file. A single line is required
+              to be no more than 10 megabytes (since 8.2.0).
+
+              Specify the filename to [4m-K,[24m [4m--config[24m as '-' to make curl read the file from stdin.
+
+              Note that to be able to specify a URL in the config file, you need to specify it  us‐
+              ing the [4m--url[24m option, and not by simply writing the URL on its own line. So, it could
+              look similar to this:
+
+              url = "https://curl.se/docs/"
+
+               # --- Example file ---
+               # this is a comment
+               url = "example.com"
+               output = "curlhere.html"
+               user-agent = "superagent/1.0"
+
+               # and fetch another URL too
+               url = "example.com/docs/manpage.html"
+               -O
+               referer = "http://nowhereatall.example.com/"
+               # --- End of example file ---
+
+              When  curl  is invoked, it (unless [4m-q,[24m [4m--disable[24m is used) checks for a default config
+              file and uses it if found, even when [4m-K,[24m [4m--config[24m is used. The default config file is
+              checked for in the following places in this order:
+
+              1) [1m"$CURL_HOME/.curlrc"[0m
+
+              2) [1m"$XDG_CONFIG_HOME/curlrc" [22m(Added in 7.73.0)
+
+              3) [1m"$HOME/.curlrc"[0m
+
+              4) Windows: [1m"%USERPROFILE%\.curlrc"[0m
+
+              5) Windows: [1m"%APPDATA%\.curlrc"[0m
+
+              6) Windows: "%USERPROFILE%\Application Data\.curlrc"
+
+              7) Non-Windows: use getpwuid to find the home directory
+
+              8) On Windows, if it finds no [4m.curlrc[24m file in the sequence described above, it checks
+              for one in the same dir the curl executable is placed.
+
+              On Windows two filenames are checked per location: [4m.curlrc[24m  and  [4m_curlrc[24m,  preferring
+              the former. Older versions on Windows checked for [4m_curlrc[24m only.
+
+              [4m-K,[24m [4m--config[24m can be used several times in a command line
+
+              Example:
+               curl --config file.txt https://example.com
+
+              See also [4m-q,[24m [4m--disable[24m.
+
+       --connect-timeout <fractional seconds>
+              Maximum  time  in seconds that you allow curl's connection to take.  This only limits
+              the connection phase, so if curl connects within the given period it continues  -  if
+              not it exits.
+
+              This  option  accepts  decimal values. The decimal value needs to be provided using a
+              dot (.) as decimal separator - not the local version even if it might  be  using  an‐
+              other separator.
+
+              The  connection  phase  is considered complete when the DNS lookup and requested TCP,
+              TLS or QUIC handshakes are done.
+
+              If [4m--connect-timeout[24m is provided several times, the last set value is used.
+
+              Examples:
+               curl --connect-timeout 20 https://example.com
+               curl --connect-timeout 3.14 https://example.com
+
+              See also [4m-m,[24m [4m--max-time[24m.
+
+       --connect-to <HOST1:PORT1:HOST2:PORT2>
+
+              For a request to the given HOST1:PORT1 pair, connect to  HOST2:PORT2  instead.   This
+              option  is suitable to direct requests at a specific server, e.g. at a specific clus‐
+              ter node in a cluster of servers. This option is only used to establish  the  network
+              connection.  It does NOT affect the hostname/port that is used for TLS/SSL (e.g. SNI,
+              certificate verification) or for the application protocols. "HOST1" and  "PORT1"  may
+              be  the  empty  string,  meaning "any host/port". "HOST2" and "PORT2" may also be the
+              empty string, meaning "use the request's original host/port".
+
+              A "host" specified to this option is compared as a string, so it needs to  match  the
+              name  used in request URL. It can be either numerical such as "127.0.0.1" or the full
+              host name such as "example.org".
+
+              [4m--connect-to[24m can be used several times in a command line
+
+              Example:
+               curl --connect-to example.com:443:example.net:8443 https://example.com
+
+              See also [4m--resolve[24m and [4m-H,[24m [4m--header[24m.
+
+       -C, --continue-at <offset>
+              Continue/Resume a previous file transfer at the given offset. The given offset is the
+              exact number of bytes that are skipped, counting from the  beginning  of  the  source
+              file  before  it  is  transferred  to  the destination. If used with uploads, the FTP
+              server command SIZE is not used by curl.
+
+              Use "-C -" to tell curl to automatically find out where/how to resume  the  transfer.
+              It then uses the given output/input files to figure that out.
+
+              If [4m-C,[24m [4m--continue-at[24m is provided several times, the last set value is used.
+
+              Examples:
+               curl -C - https://example.com
+               curl -C 400 https://example.com
+
+              See also [4m-r,[24m [4m--range[24m.
+
+       -c, --cookie-jar <filename>
+              (HTTP) Specify to which file you want curl to write all cookies after a completed op‐
+              eration.  Curl writes all cookies from its in-memory cookie storage to the given file
+              at the end of operations. If no cookies are known, no data is written.  The  file  is
+              created  using  the Netscape cookie file format. If you set the file name to a single
+              dash, "-", the cookies are written to stdout.
+
+              The file specified with [4m-c,[24m [4m--cookie-jar[24m is only used for output. No cookies are read
+              from the file. To read cookies, use the [4m-b,[24m [4m--cookie[24m option. Both options can specify
+              the same file.
+
+              This command line option activates the cookie engine that makes curl record  and  use
+              cookies. The [4m-b,[24m [4m--cookie[24m option also activates it.
+
+              If  the cookie jar cannot be created or written to, the whole curl operation does not
+              fail or even report an error clearly. Using [4m-v,[24m [4m--verbose[24m gets a  warning  displayed,
+              but that is the only visible feedback you get about this possibly lethal situation.
+
+              If [4m-c,[24m [4m--cookie-jar[24m is provided several times, the last set value is used.
+
+              Examples:
+               curl -c store-here.txt https://example.com
+               curl -c store-here.txt -b read-these https://example.com
+
+              See also [4m-b,[24m [4m--cookie[24m.
+
+       -b, --cookie <data|filename>
+              (HTTP)  Pass  the  data to the HTTP server in the Cookie header. It is supposedly the
+              data previously received from the server in a "Set-Cookie:" line. The data should  be
+              in  the  format  "NAME1=VALUE1;  NAME2=VALUE2". This makes curl use the cookie header
+              with this content explicitly in all outgoing request(s).  If  multiple  requests  are
+              done  due  to authentication, followed redirects or similar, they all get this cookie
+              passed on.
+
+              If no '=' symbol is used in the argument, it is instead treated as a filename to read
+              previously stored cookie from. This option also activates  the  cookie  engine  which
+              makes  curl record incoming cookies, which may be handy if you are using this in com‐
+              bination with the [4m-L,[24m [4m--location[24m option or do multiple URL transfers on the same  in‐
+              voke. If the file name is exactly a minus ("-"), curl instead reads the contents from
+              stdin.
+
+              The  file  format  of  the  file  to  read  cookies from should be plain HTTP headers
+              (Set-Cookie style) or the Netscape/Mozilla cookie file format.
+
+              The file specified with [4m-b,[24m [4m--cookie[24m is only used as input. No cookies are written to
+              the file. To store cookies, use the [4m-c,[24m [4m--cookie-jar[24m option.
+
+              If you use the Set-Cookie file format and do not specify a domain then the cookie  is
+              not  sent since the domain never matches. To address this, set a domain in Set-Cookie
+              line (doing that includes subdomains) or preferably: use the Netscape format.
+
+              Users often want to both read cookies from a file and write updated cookies back to a
+              file, so using both [4m-b,[24m [4m--cookie[24m and [4m-c,[24m [4m--cookie-jar[24m in the  same  command  line  is
+              common.
+
+              [4m-b,[24m [4m--cookie[24m can be used several times in a command line
+
+              Examples:
+               curl -b cookiefile https://example.com
+               curl -b cookiefile -c cookiefile https://example.com
+
+              See also [4m-c,[24m [4m--cookie-jar[24m and [4m-j,[24m [4m--junk-session-cookies[24m.
+
+       --create-dirs
+              When used in conjunction with the [4m-o,[24m [4m--output[24m option, curl creates the necessary lo‐
+              cal directory hierarchy as needed. This option creates the directories mentioned with
+              the [4m-o,[24m [4m--output[24m option combined with the path possibly set with [4m--output-dir[24m. If the
+              combined  output  file  name uses no directory, or if the directories it mentions al‐
+              ready exist, no directories are created.
+
+              Created directories are made with mode 0750 on unix style file systems.
+
+              To create remote directories when using FTP or SFTP, try [4m--ftp-create-dirs[24m.
+
+              Providing [4m--create-dirs[24m multiple times has no extra effect.  Disable  it  again  with
+              --no-create-dirs.
+
+              Example:
+               curl --create-dirs --output local/dir/file https://example.com
+
+              See also [4m--ftp-create-dirs[24m and [4m--output-dir[24m.
+
+       --create-file-mode <mode>
+              (SFTP SCP FILE) When curl is used to create files remotely using one of the supported
+              protocols, this option allows the user to set which 'mode' to set on the file at cre‐
+              ation time, instead of the default 0644.
+
+              This option takes an octal number as argument.
+
+              If [4m--create-file-mode[24m is provided several times, the last set value is used.
+
+              Example:
+               curl --create-file-mode 0777 -T localfile sftp://example.com/new
+
+              See also [4m--ftp-create-dirs[24m. Added in 7.75.0.
+
+       --crlf (FTP  SMTP)  Convert  line feeds to carriage return plus line feeds in upload. Useful
+              for MVS (OS/390).
+
+              (SMTP added in 7.40.0)
+
+              Providing [4m--crlf[24m  multiple  times  has  no  extra  effect.   Disable  it  again  with
+              --no-crlf.
+
+              Example:
+               curl --crlf -T file ftp://example.com/
+
+              See also [4m-B,[24m [4m--use-ascii[24m.
+
+       --crlfile <file>
+              (TLS)  Provide  a  file  using PEM format with a Certificate Revocation List that may
+              specify peer certificates that are to be considered revoked.
+
+              If [4m--crlfile[24m is provided several times, the last set value is used.
+
+              Example:
+               curl --crlfile rejects.txt https://example.com
+
+              See also [4m--cacert[24m and [4m--capath[24m.
+
+       --curves <algorithm list>
+              (TLS) Tells curl to request specific curves to use during SSL  session  establishment
+              according  to  RFC 8422, 5.1.  Multiple algorithms can be provided by separating them
+              with ":" (e.g.  "X25519:P-521").  The  parameter  is  available  identically  in  the
+              "openssl s_client/s_server" utilities.
+
+              [4m--curves[24m  allows a OpenSSL powered curl to make SSL-connections with exactly the (EC)
+              curve requested by the client, avoiding nontransparent client/server negotiations.
+
+              If this option is set, the default curves list built into OpenSSL are ignored.
+
+              If [4m--curves[24m is provided several times, the last set value is used.
+
+              Example:
+               curl --curves X25519 https://example.com
+
+              See also [4m--ciphers[24m. Added in 7.73.0.
+
+       --data-ascii <data>
+              (HTTP) This is just an alias for [4m-d,[24m [4m--data[24m.
+
+              [4m--data-ascii[24m can be used several times in a command line
+
+              Example:
+               curl --data-ascii @file https://example.com
+
+              See also [4m--data-binary[24m, [4m--data-raw[24m and [4m--data-urlencode[24m.
+
+       --data-binary <data>
+              (HTTP) This posts data exactly as specified with no extra processing whatsoever.
+
+              If you start the data with the letter @, the rest  should  be  a  filename.  Data  is
+              posted  in a similar manner as [4m-d,[24m [4m--data[24m does, except that newlines and carriage re‐
+              turns are preserved and conversions are never done.
+
+              Like  [4m-d,[24m  [4m--data[24m  the  default  content-type  sent  to  the   server   is   applica‐
+              tion/x-www-form-urlencoded.  If  you  want the data to be treated as arbitrary binary
+              data by the server then set the content-type to octet-stream: -H  "Content-Type:  ap‐
+              plication/octet-stream".
+
+              If this option is used several times, the ones following the first append data as de‐
+              scribed in [4m-d,[24m [4m--data[24m.
+
+              [4m--data-binary[24m can be used several times in a command line
+
+              Example:
+               curl --data-binary @filename https://example.com
+
+              See also [4m--data-ascii[24m.
+
+       --data-raw <data>
+              (HTTP) This posts data similarly to [4m-d,[24m [4m--data[24m but without the special interpretation
+              of the @ character.
+
+              [4m--data-raw[24m can be used several times in a command line
+
+              Examples:
+               curl --data-raw "hello" https://example.com
+               curl --data-raw "@at@at@" https://example.com
+
+              See also [4m-d,[24m [4m--data[24m.
+
+       --data-urlencode <data>
+              (HTTP)  This  posts  data, similar to the other [4m-d,[24m [4m--data[24m options with the exception
+              that this performs URL-encoding.
+
+              To be CGI-compliant, the <data> part should begin with a [4mname[24m followed by a separator
+              and a content specification. The <data> part can be passed to curl using one  of  the
+              following syntaxes:
+
+              content
+                     This  makes  curl  URL-encode the content and pass that on. Just be careful so
+                     that the content does not contain any = or @ symbols, as that makes the syntax
+                     match one of the other cases below!
+
+              =content
+                     This makes curl URL-encode the content and pass that on. The preceding =  sym‐
+                     bol is not included in the data.
+
+              name=content
+                     This  makes  curl  URL-encode the content part and pass that on. Note that the
+                     name part is expected to be URL-encoded already.
+
+              @filename
+                     This makes curl load data  from  the  given  file  (including  any  newlines),
+                     URL-encode that data and pass it on in the POST.
+
+              name@filename
+                     This  makes  curl  load  data  from  the  given file (including any newlines),
+                     URL-encode that data and pass it on in the POST. The name part gets  an  equal
+                     sign  appended,  resulting in [4mname=urlencoded-file-content[24m. Note that the name
+                     is expected to be URL-encoded already.
+
+              [4m--data-urlencode[24m can be used several times in a command line
+
+              Examples:
+               curl --data-urlencode name=val https://example.com
+               curl --data-urlencode =encodethis https://example.com
+               curl --data-urlencode name@file https://example.com
+               curl --data-urlencode @fileonly https://example.com
+
+              See also [4m-d,[24m [4m--data[24m and [4m--data-raw[24m.
+
+       -d, --data <data>
+              (HTTP MQTT) Sends the specified data in a POST request to the  HTTP  server,  in  the
+              same  way  that a browser does when a user has filled in an HTML form and presses the
+              submit button. This makes curl pass the data to the server using the content-type ap‐
+              plication/x-www-form-urlencoded. Compare to [4m-F,[24m [4m--form[24m.
+
+              [4m--data-raw[24m is almost the same but does not have a special  interpretation  of  the  @
+              character.  To  post data purely binary, you should instead use the [4m--data-binary[24m op‐
+              tion. To URL-encode the value of a form field you may use [4m--data-urlencode[24m.
+
+              If any of these options is used more than once on the same  command  line,  the  data
+              pieces  specified  are merged with a separating &-symbol. Thus, using '-d name=daniel
+              -d   skill=lousy'    would    generate    a    post    chunk    that    looks    like
+              'name=daniel&skill=lousy'.
+
+              If  you  start the data with the letter @, the rest should be a file name to read the
+              data from, or - if you want curl to read the data from stdin.  Posting  data  from  a
+              file  named  'foobar'  would thus be done with [4m-d,[24m [4m--data[24m @foobar. When [4m-d,[24m [4m--data[24m is
+              told to read from a file like that, carriage returns and newlines are  stripped  out.
+              If  you  do  not want the @ character to have a special interpretation use [4m--data-raw[0m
+              instead.
+
+              The data for this option is passed on to the server exactly as provided on  the  com‐
+              mand  line. curl does not convert, change or improve it. It is up to the user to pro‐
+              vide the data in the correct form.
+
+              [4m-d,[24m [4m--data[24m can be used several times in a command line
+
+              Examples:
+               curl -d "name=curl" https://example.com
+               curl -d "name=curl" -d "tool=cmdline" https://example.com
+               curl -d @filename https://example.com
+
+              See also [4m--data-binary[24m, [4m--data-urlencode[24m and [4m--data-raw[24m. This option is mutually  ex‐
+              clusive to [4m-F,[24m [4m--form[24m and [4m-I,[24m [4m--head[24m and [4m-T,[24m [4m--upload-file[24m.
+
+       --delegation <LEVEL>
+              (GSS/kerberos)  Set  LEVEL  to tell the server what it is allowed to delegate when it
+              comes to user credentials.
+
+              none   Do not allow any delegation.
+
+              policy Delegates if and only if the OK-AS-DELEGATE flag is set in the  Kerberos  ser‐
+                     vice ticket, which is a matter of realm policy.
+
+              always Unconditionally allow the server to delegate.
+
+              If [4m--delegation[24m is provided several times, the last set value is used.
+
+              Example:
+               curl --delegation "none" https://example.com
+
+              See also [4m-k,[24m [4m--insecure[24m and [4m--ssl[24m.
+
+       --digest
+              (HTTP) Enables HTTP Digest authentication. This is an authentication scheme that pre‐
+              vents  the password from being sent over the wire in clear text. Use this in combina‐
+              tion with the normal [4m-u,[24m [4m--user[24m option to set user name and password.
+
+              Providing [4m--digest[24m multiple times  has  no  extra  effect.   Disable  it  again  with
+              --no-digest.
+
+              Example:
+               curl -u name:password --digest https://example.com
+
+              See  also [4m-u,[24m [4m--user[24m, [4m--proxy-digest[24m and [4m--anyauth[24m. This option is mutually exclusive
+              to [4m--basic[24m and [4m--ntlm[24m and [4m--negotiate[24m.
+
+       --disable-eprt
+              (FTP) Tell curl to disable the use of the EPRT and LPRT commands  when  doing  activ
